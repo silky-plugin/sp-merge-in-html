@@ -6,10 +6,12 @@ const _cheerio = require('cheerio')
 const _path = require('path')
 const _mergeScript = require('./merge-script');
 const _mergeStype = require('./merge-style');
+const _fs = require("fs");
+
 //寻找真实路径
 const getRealFilePath = (cli, href, setting)=>{
   let extname = _path.extname(href)
-  let search = setting.search || [];
+  let search = setting.search;
   
   let filePath = _path.join(cli.cwd, href);
   
@@ -27,58 +29,99 @@ const getRealFilePath = (cli, href, setting)=>{
   return filePath;
 }
 
+//获取文件数据
+const getFileData = (cli, href, targetHref, buildConfig, setting)=>{
+  if(!href || /^(\s)*$/.test(href)){
+    return;
+  }
+  let realFilePath = getRealFilePath(cli, href, setting);
+  if(!realFilePath){
+    throw Error(`找不到 合并项文件${href}`)
+  }
+  buildConfig.__del.push(_path.join(buildConfig.outdir,  href))
+  buildConfig.__extra.push({
+    inputFilePath: realFilePath,
+    outputFilePath: _path.join(buildConfig.outdir,  targetHref),
+    outdir: buildConfig.outdir,
+    outRelativeDir: buildConfig.outRelativeDir,
+    inputFileRelativePath:  href,
+    outputFileRelativePath: _path.join(buildConfig.outRelativeDir, targetHref),
+    fileName: href.split('/').pop(),
+    appendFile: true,
+    appendFilePrefix: ";",
+    ignore: false
+  })
+}
+
+//继承
+const extend = (son, father)=>{
+  if(!father){return son}
+  if(!son){return father;}
+  Object.keys(father).forEach((key)=>{
+    if(father[key] == null){return}
+    son[key] = father[key]
+  })
+  return son
+}
 
 //标签引用
-const mergeTagImport = (cli, content, options, data)=>{
+const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   let $ = _cheerio.load(content, {decodeEntities: false});
-  
   // /path/to/xx.html =>  xx
   let htmlFileName = data.outputFilePath.split('/').pop().split('.').shift();
   
-  //处理css
-  let cssSetting = options.css || {};
-  let jsSetting = options.js || {};
-  
-  //
-  let cssHrefList = [];
+  // START ------------------------css组件提取
+  //默认配置
+  let cssSetting = extend({seletor: ["link[component]"], out: "/css/$file.css", search: []}, options.css);
+  //需要出入的合并后的文件链接
+  let cssHref = cssSetting.out.replace('$file', htmlFileName)
+  let hasCssComponent = false;
+  //属于css组件的选择器数组
+  let cssComponentSelector = [].concat(cssSetting.seletor);
 
-  $("link[type='component/css']").each(function(){
-    let href = $(this).attr('href');
-    if(!href || /^(\s)*$/.test(href)){
-      return;
-    }
-    let realFilePath = getRealFilePath(cli, href, cssSetting);
-    if(!realFilePath){
-      throw Error(`找不到 合并项文件${href}`)
-    }
-
-    //移除当前引用
-    $(this).remove()
-
-  });
-
+  cssComponentSelector.forEach((seletor)=>{
+    $(seletor).each(function(){
+      //提取组件链接到的文件路径，放入到 buildConfig.__extra里面
+      getFileData(cli, $(this).attr('href'), cssHref, buildConfig, cssSetting);
+      hasCssComponent = true
+      $(this).remove();
+    });
+  })
   //添加全局引用到哪个选择器
-  let cssAppendToSelector = cssSetting.appendTo || "head";
-  //插入全局引用
-  let cssHref = (cssSetting.out || `/css/$file.css`).replace('$file', htmlFileName)
-  $(cssAppendToSelector).append(`<link href=${cssHref} type="text/css" rel="stylesheet"/>`)
+  if(hasCssComponent){
+    let cssAppendToSelector = cssSetting.appendTo || "head";
+    $(cssAppendToSelector).append(`<link href=${cssHref} type="text/css" rel="stylesheet"/>`)
+  }
+  // END ----------------------- css组件提取结束
 
-  //插入js
-  let jsAppendToSelector = jsSetting.appendTo || "body";
-  let jsSrc = (jsSetting.out || `/js/$file.js`).replace('$file', htmlFileName);
-  $(jsAppendToSelector).append(`<script src="${jsSrc}"></script>`);
+  // START ------------------------js组件提取
+  let jsSetting = extend({seletor: ["script[component]"], out: "/js/$file.js", search:[]}, options.js);
+  let hasJScomponent = false;
+  let jsComponentSelector = [].concat(jsSetting.seletor);
+  let jsSrc = jsSetting.out.replace('$file', htmlFileName);
+  jsComponentSelector.forEach((seletor)=>{
+    $(seletor).each(function(){
+      getFileData(cli, $(this).attr('src'), jsSrc, buildConfig, jsSetting);
+      hasJScomponent = true
+      $(this).remove();
+    });
+  })
+  if(hasJScomponent){
+    let jsAppendToSelector = jsSetting.appendTo || "body";
+    $(jsAppendToSelector).append(`<script src="${jsSrc}"></script>`);
+  }
+  // END ------------------------ js组件提取结束
 
-
+  //合并 <script> 里面的内容
   if(options.script){
     _mergeScript($)
   }
+  //合并 <style> 里面的内容
   if(options.style){
     _mergeStype($)
   }
 
   return $.html()
-
-
 }
 
 const replaceTag = (content)=>{
@@ -86,7 +129,7 @@ const replaceTag = (content)=>{
   $("link[type='component/css']").each(function(){
     $(this).attr('type', 'text/css')
   });
-  $("script[type='component/js']]").each(function(){
+  $("script[type='component/js']").each(function(){
     $(this).removeAttr('type')
   })
   return $.html()
@@ -102,18 +145,22 @@ exports.registerPlugin = (cli, options)=>{
     if(data.status != 200 || !responseContent){
       return cb(null, responseContent)
     }
-
-    cb(null, replaceTag(responseContent, data))
+    try{
+      responseContent = replaceTag(responseContent, data)
+      cb(null, responseContent)
+    }catch(e){
+      cb(e)
+    }    
 
   }, 1)
 
-  cli.registerHook('build:didCompile', (data, content, cb)=>{
+  cli.registerHook('build:didCompile', (buildConfig, data, content, cb)=>{
     if(!/(\.html)$/.test(data.outputFilePath) || !content){
-      return cb(null, data, content)
+      return cb(null, content)
     }
     try{
-      content = mergeTagImport(cli, content, options, data)
-      cb(null, data, content)
+      content = mergeTagImport(cli, content, options, data, buildConfig)
+      cb(null, content)
     }catch(e){
       cb(e)
     }

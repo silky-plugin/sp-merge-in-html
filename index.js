@@ -13,13 +13,13 @@ const getRealFilePath = (cli, href, setting)=>{
   let extname = _path.extname(href)
   let search = setting.search;
 
-  let filePath = _path.join(cli.cwd, href);
+  let filePath = _path.join(cli.cwd(), href);
 
   //如果原文件不存在，则搜索匹配项
   if(!_fs.existsSync(filePath)){
     filePath = false;
     for(let i = 0, length = search.length; i < length; i++){
-      let tmpFilepath = _path.join(cli.cwd, href.replace(/(\.\w+)$/, `.${search[i]}`))
+      let tmpFilepath = _path.join(cli.cwd(), href.replace(/(\.\w+)$/, `.${search[i]}`))
       if(_fs.existsSync(tmpFilepath)){
         filePath = tmpFilepath;
         break

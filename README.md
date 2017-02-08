@@ -11,14 +11,14 @@
     "search":["less"],
     "out": "css/file.css",
     "appendTo": "head",
-    
+
   },
   "js": {
     "selector": ["script[component]"]
     "search":[],
     "out": "js/$file.js",
     "appendTo": "head",
-   
+
   },
   "script": false //or true,
   "stype":  false // or true
@@ -33,12 +33,12 @@ css 用来配置 link 组件。如有`index.html`如下：
 <html>
   <head>
     ...
-    <link rel="stylesheet" href="/css/A.css" type="text/css"> 
-    <link rel="stylesheet" href="/css/component-A.css" type="text/css" component> 
+    <link rel="stylesheet" href="/css/A.css" type="text/css">
+    <link rel="stylesheet" href="/css/component-A.css" type="text/css" component>
   </head>
   <body>
   ...
-    <link rel="stylesheet" href="/css/component-B.css" type="text/css" component> 
+    <link rel="stylesheet" href="/css/component-B.css" type="text/css" component>
   </body>
 <html>
 ```
@@ -53,7 +53,7 @@ css 用来配置 link 组件。如有`index.html`如下：
 
   插件提取 `$(css.selector)` 的`href`的值，在项目目录下进行搜索匹配。
   默认搜索`href`本身表示的文件链接,如`/css/component-A.css`。
-    如果找到, 那么就会把文件内容，写入到配置`css.out`的文件中。
+    如果找到, 那么就会把文件内容，写入到`css.out`配置的文件中。
     如果没有找到，那么会依次用`css.search`的元素 替换 该`href`的`.css`后缀，直到找到为止。
     如果搜索完 全部后缀依然没有找到，那么抛出异常。
 
@@ -73,8 +73,8 @@ css 用来配置 link 组件。如有`index.html`如下：
 <html>
   <head>
     ...
-    <link rel="stylesheet" href="/css/A.css" type="text/css"> 
-    <link rel="stylesheet" href="/css/index.css" type="text/css"> 
+    <link rel="stylesheet" href="/css/A.css" type="text/css">
+    <link rel="stylesheet" href="/css/index.css" type="text/css">
   </head>
   <body>
   ...

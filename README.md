@@ -7,18 +7,17 @@
 ```js
 "sp-merge-in-html":{
   "css": {
-    "selector": ["link[component]"]
+    "selector": ["link[component]"],
     "search":["less"],
-    "out": "css/file.css",
-    "appendTo": "head",
+    "out": "css/$file.css",
+    "appendTo": "head"
 
   },
   "js": {
-    "selector": ["script[component]"]
+    "selector": ["script[component]"],
     "search":[],
     "out": "js/$file.js",
-    "appendTo": "head",
-
+    "appendTo": "head"
   },
   "script": false //or true,
   "stype":  false // or true

@@ -31,6 +31,7 @@ const getRealFilePath = (cli, href, setting)=>{
 
 //获取文件数据
 const getFileData = (cli, href, targetHref, buildConfig, setting, appendFilePrefix)=>{
+  //加到每个文件后到，用来隔离每个文件。比如js用`;`隔开
   appendFilePrefix = appendFilePrefix ? appendFilePrefix : ""
   if(!href || /^(\s)*$/.test(href)){
     return;

@@ -14,19 +14,19 @@ const getRealFilePath = (cli, href, setting)=>{
   let search = setting.search;
 
   let filePath = _path.join(cli.cwd(), href);
-
+  if(_fs.existsSync(filePath)){
+    return filePath
+  }
   //如果原文件不存在，则搜索匹配项
-  if(!_fs.existsSync(filePath)){
-    filePath = false;
-    for(let i = 0, length = search.length; i < length; i++){
-      let tmpFilepath = _path.join(cli.cwd(), href.replace(/(\.\w+)$/, `.${search[i]}`))
-      if(_fs.existsSync(tmpFilepath)){
-        filePath = tmpFilepath;
-        break
-      }
+  filePath = false;
+  for(let i = 0, length = search.length; i < length; i++){
+    let tmpFilepath = _path.join(cli.cwd(), href.replace(/(\.\w+)$/, `.${search[i]}`))
+    if(_fs.existsSync(tmpFilepath)){
+      filePath = tmpFilepath;
+      break
     }
   }
-  return filePath;
+  return filePath
 }
 
 //获取文件数据
@@ -70,7 +70,7 @@ const extend = (son, father)=>{
 const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   let $ = _cheerio.load(content, {decodeEntities: false});
   // /path/to/xx.html =>  xx
-  let htmlFileName = data.outputFilePath.split('/').pop().split('.').shift();
+  let htmlFileName = data.outputFilePath.split(_path.sep).pop().split('.').shift();
 
   // START ------------------------css组件提取
   //默认配置

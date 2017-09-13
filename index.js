@@ -7,7 +7,7 @@ const _path = require('path')
 const _mergeScript = require('./merge-script');
 const _mergeStype = require('./merge-style');
 const _fs = require("fs");
-
+const _getOutputFilepath = require('./getOutputFilepath')
 //寻找真实路径
 const getRealFilePath = (cli, href, setting)=>{
   let extname = _path.extname(href)
@@ -76,7 +76,7 @@ const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   //默认配置
   let cssSetting = extend({selector: ["link[component]"], out: "/css/$file.css", search: []}, options.css);
   //需要出入的合并后的文件链接
-  let cssHref = cssSetting.out.replace('$file', htmlFileName)
+  let cssHref =  _getOutputFilepath(cssSetting.out, htmlFileName, data.inputFileRelativePath) //.replace('$file', htmlFileName).replace('$path', )
   let hasCssComponent = false;
   //属于css组件的选择器数组
   let cssComponentSelector = [].concat(cssSetting.selector);
@@ -100,7 +100,7 @@ const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   let jsSetting = extend({selector: ["script[component]"], out: "/js/$file.js", search:[]}, options.js);
   let hasJScomponent = false;
   let jsComponentSelector = [].concat(jsSetting.selector);
-  let jsSrc = jsSetting.out.replace('$file', htmlFileName);
+  let jsSrc =  _getOutputFilepath(jsSetting.out, htmlFileName, data.inputFileRelativePath) //jsSetting.out.replace('$file', htmlFileName);
 
   jsComponentSelector.forEach((selector)=>{
     $(selector).each(function(){

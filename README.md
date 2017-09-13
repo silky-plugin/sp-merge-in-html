@@ -58,7 +58,7 @@ css 用来配置 link 组件。如有`index.html`如下：
 
 #### css.out 可选， 默认："/css/$file.css"
 
-  输出文件路径。 其中 `$file` 为变量， 会把 该`link`所在的`html`名字替换它。
+  输出文件路径。 其中 `$file` 为变量， 会把 该`link`所在的`html`名字替换它。 另外还有变量`$path`表示所在html的相对路径，同时支持`$path[x]`模式截取文件夹层数
 
 
 ### css.appendTo  可选 默认 "head"

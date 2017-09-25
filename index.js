@@ -157,16 +157,16 @@ exports.registerPlugin = (cli, options)=>{
     }
 
   }, 1)
-
   cli.registerHook('build:didCompile', (buildConfig, data, content, cb)=>{
     if(!/(\.html)$/.test(data.outputFilePath) || !content){
       return cb(null, content)
     }
+    let err = null
     try{
       content = mergeTagImport(cli, content, options, data, buildConfig)
-      cb(null, content)
     }catch(e){
-      cb(e)
+      err = e
     }
+    cb(err, content)
   }, 1)
 }

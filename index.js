@@ -29,8 +29,8 @@ const getRealFilePath = (cli, href, setting)=>{
   return filePath
 }
 
-//获取文件数据
-const getFileData = (cli, href, targetHref, buildConfig, setting, appendFilePrefix)=>{
+//设置待编译文件数据
+const pushComponentToCompileFileQueue = (cli, href, targetHref, buildConfig, setting, appendFilePrefix)=>{
   //加到每个文件后到，用来隔离每个文件。比如js用`;`隔开
   appendFilePrefix = appendFilePrefix ? appendFilePrefix : ""
   if(!href || /^(\s)*$/.test(href)){
@@ -70,13 +70,13 @@ const extend = (son, father)=>{
 const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   let $ = _cheerio.load(content, {decodeEntities: false});
   // /path/to/xx.html =>  xx
-  let htmlFileName = data.outputFilePath.split(_path.sep).pop().split('.').shift();
+  let htmlFileName = _path.parse(data.outputFilePath).name
 
   // START ------------------------css组件提取
   //默认配置
   let cssSetting = extend({selector: ["link[component]"], out: "/css/$file.css", search: []}, options.css);
   //需要出入的合并后的文件链接
-  let cssHref =  _getOutputFilepath(cssSetting.out, htmlFileName, data.inputFileRelativePath) //.replace('$file', htmlFileName).replace('$path', )
+  let cssHref =  _getOutputFilepath(cssSetting.out, htmlFileName, data.inputFileRelativePath)
   let hasCssComponent = false;
   //属于css组件的选择器数组
   let cssComponentSelector = [].concat(cssSetting.selector);
@@ -84,7 +84,7 @@ const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   cssComponentSelector.forEach((selector)=>{
     $(selector).each(function(){
       //提取组件链接到的文件路径，放入到 buildConfig.__extra里面
-      getFileData(cli, $(this).attr('href'), cssHref, buildConfig, cssSetting);
+      pushComponentToCompileFileQueue(cli, $(this).attr('href'), cssHref, buildConfig, cssSetting);
       hasCssComponent = true
       $(this).remove();
     });
@@ -100,11 +100,11 @@ const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   let jsSetting = extend({selector: ["script[component]"], out: "/js/$file.js", search:[]}, options.js);
   let hasJScomponent = false;
   let jsComponentSelector = [].concat(jsSetting.selector);
-  let jsSrc =  _getOutputFilepath(jsSetting.out, htmlFileName, data.inputFileRelativePath) //jsSetting.out.replace('$file', htmlFileName);
+  let jsSrc =  _getOutputFilepath(jsSetting.out, htmlFileName, data.inputFileRelativePath)
 
   jsComponentSelector.forEach((selector)=>{
     $(selector).each(function(){
-      getFileData(cli, $(this).attr('src'), jsSrc, buildConfig, jsSetting, ";");
+      pushComponentToCompileFileQueue(cli, $(this).attr('src'), jsSrc, buildConfig, jsSetting, ";");
       hasJScomponent = true
       $(this).remove();
     });

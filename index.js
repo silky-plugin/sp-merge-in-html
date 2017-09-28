@@ -92,7 +92,7 @@ const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   //添加全局引用到哪个选择器
   if(hasCssComponent){
     let cssAppendToSelector = cssSetting.appendTo || "head";
-    $(cssAppendToSelector).append(`<link type="text/css" rel="stylesheet" href="${cssHref}" />`)
+    $(cssAppendToSelector).append(`<link type="text/css" rel="stylesheet" href="${cssHref.replace(/\\/g, "/")}" />`)
   }
   // END ----------------------- css组件提取结束
 
@@ -112,7 +112,7 @@ const mergeTagImport = (cli, content, options, data, buildConfig)=>{
 
   if(hasJScomponent){
     let jsAppendToSelector = jsSetting.appendTo || "body";
-    $(jsAppendToSelector).append(`<script src="${jsSrc}"></script>`);
+    $(jsAppendToSelector).append(`<script src="${jsSrc.replace(/\\/g, "/")}"></script>`);
   }
   // END ------------------------ js组件提取结束
 

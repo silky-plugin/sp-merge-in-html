@@ -7,7 +7,7 @@ module.exports = (href, filename, filepath)=>{
         return href.replace("$path", filepath)
     }
     filepath = filepath.replace(_path.parse(filepath).ext, "")
-    let pathArr = filepath.split("/")
+    let pathArr = filepath.split(_path.sep)
     if(singleMatchArr){
         let replaceStr = singleMatchArr[0]
         let index = ~~singleMatchArr[1]

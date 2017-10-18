@@ -1,6 +1,6 @@
 {
   "name": "sp-merge-in-html",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "dependencies": {
     "cheerio": "^0.22.0"
   }

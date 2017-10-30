@@ -2,7 +2,6 @@
  * Desc: 合并页面的js，css引用
  */
 'use strict';
-const _cheerio = require('cheerio')
 const _path = require('path')
 const _mergeScript = require('./merge-script');
 const _mergeStype = require('./merge-style');
@@ -32,26 +31,29 @@ const getRealFilePath = (cli, href, setting)=>{
 //设置待编译文件数据
 const pushComponentToCompileFileQueue = (cli, href, targetHref, buildConfig, setting, appendFilePrefix)=>{
   //加到每个文件后到，用来隔离每个文件。比如js用`;`隔开
-  appendFilePrefix = appendFilePrefix ? appendFilePrefix : ""
-  if(!href || /^(\s)*$/.test(href)){
-    return;
-  }
-  let realFilePath = getRealFilePath(cli, href, setting);
-  if(!realFilePath){
-    throw Error(`找不到 合并项文件${href}`)
-  }
-  buildConfig.__del.push(_path.join(buildConfig.outdir,  href))
-  buildConfig.__extra.push({
-    inputFilePath: realFilePath,
-    outputFilePath: _path.join(buildConfig.outdir,  targetHref),
-    outdir: buildConfig.outdir,
-    outRelativeDir: buildConfig.outRelativeDir,
-    inputFileRelativePath:  href,
-    outputFileRelativePath: _path.join(buildConfig.outRelativeDir, targetHref),
-    fileName: href.split('/').pop(),
-    appendFile: true,
-    appendFilePrefix: appendFilePrefix,
-    ignore: false
+  appendFilePrefix = appendFilePrefix ? appendFilePrefix : "";
+  let hrefList = [].concat(href)
+  hrefList.forEach((href)=>{
+    if(!href || /^(\s)*$/.test(href)){
+      return;
+    }
+    let realFilePath = getRealFilePath(cli, href, setting);
+    if(!realFilePath){
+      throw Error(`找不到 合并项文件${href}`)
+    }
+    buildConfig.__del.push(_path.join(buildConfig.outdir,  href))
+    buildConfig.__extra.push({
+      inputFilePath: realFilePath,
+      outputFilePath: _path.join(buildConfig.outdir,  targetHref),
+      outdir: buildConfig.outdir,
+      outRelativeDir: buildConfig.outRelativeDir,
+      inputFileRelativePath:  href,
+      outputFileRelativePath: _path.join(buildConfig.outRelativeDir, targetHref),
+      fileName: href.split('/').pop(),
+      appendFile: true,
+      appendFilePrefix: appendFilePrefix,
+      ignore: false
+    })
   })
 }
 
@@ -66,77 +68,103 @@ const extend = (son, father)=>{
   return son
 }
 
+const findHref = (errorMsg, hrefList, data)=>{
+  return function(line){
+    let href = ""
+    let hrefMatch = line.match(/href=['"]([^'"]+)['"]/)
+    let srcMatch = line.match(/src=['"]([^'"]+)['"]/)
+    if(hrefMatch){
+      href = hrefMatch[1]
+    }else if(srcMatch){
+      href = srcMatch[1]
+    }else{
+      errorMsg.push(`无法合成资源 ${data.inputFileRelativePath} 中 ${line} 不包含 href 属性，请移除标签的component属性，修复问题`)
+      return line
+    }
+    if(/^((http:\/\/)|(https:\/\/)|(\/\/))/.test(href)){
+      errorMsg.push(`无法合成资源， 在${data.inputFileRelativePath}中修改${line}href或src为本地路径，即删除 '{{global.xxx}}' 用合适的本地路径代替（推荐）】或者【移除标签上的component】`)
+      return line
+    }
+    hrefList.push(href)
+    return ""
+  }
+}
+
 //标签引用
 const mergeTagImport = (cli, content, options, data, buildConfig)=>{
-  let $ = _cheerio.load(content, {decodeEntities: false});
-  // /path/to/xx.html =>  xx
   let htmlFileName = _path.parse(data.outputFilePath).name
-
   // START ------------------------css组件提取
   //默认配置
   let cssSetting = extend({selector: ["link[component]"], out: "/css/$file.css", search: []}, options.css);
-  //需要出入的合并后的文件链接
+  //需要输出的合并后的文件链接
   let cssHref =  _getOutputFilepath(cssSetting.out, htmlFileName, data.inputFileRelativePath)
-  let hasCssComponent = false;
-  //属于css组件的选择器数组
-  let cssComponentSelector = [].concat(cssSetting.selector);
 
-  cssComponentSelector.forEach((selector)=>{
-    $(selector).each(function(){
-      //提取组件链接到的文件路径，放入到 buildConfig.__extra里面
-      pushComponentToCompileFileQueue(cli, $(this).attr('href'), cssHref, buildConfig, cssSetting);
-      hasCssComponent = true
-      $(this).remove();
-    });
-  })
-  //添加全局引用到哪个选择器
-  if(hasCssComponent){
-    let cssAppendToSelector = cssSetting.appendTo || "head";
-    $(cssAppendToSelector).append(`<link type="text/css" rel="stylesheet" href="${cssHref.replace(/\\/g, "/")}" />`)
+  //固定link component  和  link[type='component/css']
+  let errorMsg = [];
+  let cssHrefList = [];
+  let find = findHref(errorMsg, cssHrefList, data)
+  content = content.replace(/<link((\s+)|[^>]+\s)component(\s?|(\s+[^>]+?))\/?>/g, find)
+    .replace(/<link((\s+)|[^>]+\s)component=""(\s?|(\s+[^>]+?))\/?>/g, find)
+    .replace(/<link((\s+)|[^>]+\s)type=['"]component\/css['"](\s?|(\s+[^>]+?))\/?>/g,find)
+  if(errorMsg.length){
+    throw new Error(errorMsg)
+  }
+  if(cssHrefList.length){
+    pushComponentToCompileFileQueue(cli, cssHrefList, cssHref, buildConfig, cssSetting);
+    if(cssSetting.appendTo=="body"){
+      content = content.replace(/<body>([\s\S]+)<\/body>/, `<body>$1<link type="text/css" rel="stylesheet" href="${cssHref.replace(/\\/g, "/")}" /></body>`)
+    }else{
+      content = content.replace(/<head>([\s\S]+)<\/head>/, `<head>$1<link type="text/css" rel="stylesheet" href="${cssHref.replace(/\\/g, "/")}"/></head>`)
+    }
   }
   // END ----------------------- css组件提取结束
-
   // START ------------------------js组件提取
   let jsSetting = extend({selector: ["script[component]"], out: "/js/$file.js", search:[]}, options.js);
-  let hasJScomponent = false;
-  let jsComponentSelector = [].concat(jsSetting.selector);
   let jsSrc =  _getOutputFilepath(jsSetting.out, htmlFileName, data.inputFileRelativePath)
+  let jsSrcList = [];
+  let findSrc = findHref(errorMsg, jsSrcList, data)
+  content = content.replace(/<script((\s+)|[^>]+\s)component(\s?|(\s+[^>]+?))>\s?<\/script>/g, findSrc)
+    .replace(/<script((\s+)|[^>]+\s)component=""(\s?|(\s+[^>]+?))>\s?<\/script>/g, findSrc)
+    .replace(/<script((\s+)|[^>]+\s)type=['"]component\/js['"](\s?|(\s+[^>]+?))>\s?<\/script>/g,findSrc)
 
-  jsComponentSelector.forEach((selector)=>{
-    $(selector).each(function(){
-      pushComponentToCompileFileQueue(cli, $(this).attr('src'), jsSrc, buildConfig, jsSetting, ";");
-      hasJScomponent = true
-      $(this).remove();
-    });
-  });
-
-  if(hasJScomponent){
-    let jsAppendToSelector = jsSetting.appendTo || "body";
-    $(jsAppendToSelector).append(`<script src="${jsSrc.replace(/\\/g, "/")}"></script>`);
+  if(errorMsg.length){
+    throw new Error(errorMsg)
+  }
+  if(jsSrcList.length){
+    pushComponentToCompileFileQueue(cli, jsSrcList, cssHref, buildConfig, cssSetting);
+    if(jsSetting.appendTo=="body"){
+      content = content.replace(/<body>([\s\S]+?)<\/body>/, `<body>$1<script src="${jsSrc.replace(/\\/g, "/")}"></script></body>`)
+    }else{
+      content = content.replace(/<head>([\s\S]+?)<\/head>/, `<head>$1<script src="${jsSrc.replace(/\\/g, "/")}"></script></head>`)
+    }
   }
   // END ------------------------ js组件提取结束
-
   //合并 <script> 里面的内容
   if(options.script){
-    _mergeScript($)
+    content = _mergeScript(content)
   }
   //合并 <style> 里面的内容
   if(options.style){
-    _mergeStype($)
+    content = _mergeStype(content)
   }
 
-  return $.html()
+  return content
 }
 
 const replaceTag = (content)=>{
-  let $ = _cheerio.load(content, {decodeEntities: false});
-  $("link[type='component/css']").each(function(){
-    $(this).attr('type', 'text/css')
-  });
-  $("script[type='component/js']").each(function(){
-    $(this).removeAttr('type')
+  content = content.replace(/<link[^>]*type=['"]([^>'"]+)['"][^>]*>/gi, (line, match)=>{
+    if(match.indexOf("component")!=-1){
+      return line.replace(match, "text/css")
+    }
+    return line
   })
-  return $.html()
+  content = content.replace(/<script[^>]*type=['"]([^>'"]+)['"][^>]*>/gi, (line, match)=>{
+    if(match.indexOf("component")!=-1){
+      return line.replace(match, "text/javascript")
+    }
+    return line
+  })
+  return content
 }
 
 exports.registerPlugin = (cli, options)=>{

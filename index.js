@@ -7,6 +7,8 @@ const _mergeScript = require('./merge-script');
 const _mergeStype = require('./merge-style');
 const _fs = require("fs");
 const _getOutputFilepath = require('./getOutputFilepath')
+const _previewMergeTag = require('./previewMergeTag')
+const _utils = require('./utils')
 //寻找真实路径
 const getRealFilePath = (cli, href, setting)=>{
   let extname = _path.extname(href)
@@ -57,52 +59,20 @@ const pushComponentToCompileFileQueue = (cli, href, targetHref, buildConfig, set
   })
 }
 
-//继承
-const extend = (son, father)=>{
-  if(!father){return son}
-  if(!son){return father;}
-  Object.keys(father).forEach((key)=>{
-    if(father[key] == null){return}
-    son[key] = father[key]
-  })
-  return son
-}
-
-const findHref = (errorMsg, hrefList, data)=>{
-  return function(line){
-    let href = ""
-    let hrefMatch = line.match(/href=['"]([^'"]+)['"]/)
-    let srcMatch = line.match(/src=['"]([^'"]+)['"]/)
-    if(hrefMatch){
-      href = hrefMatch[1]
-    }else if(srcMatch){
-      href = srcMatch[1]
-    }else{
-      errorMsg.push(`无法合成资源 ${data.inputFileRelativePath} 中 ${line} 不包含 href 属性，请移除标签的component属性，修复问题`)
-      return line
-    }
-    if(/^((http:\/\/)|(https:\/\/)|(\/\/))/.test(href)){
-      errorMsg.push(`无法合成资源， 在${data.inputFileRelativePath}中修改${line}href或src为本地路径，即删除 '{{global.xxx}}' 用合适的本地路径代替（推荐）】或者【移除标签上的component】`)
-      return line
-    }
-    hrefList.push(href)
-    return ""
-  }
-}
 
 //标签引用
 const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   let htmlFileName = _path.parse(data.outputFilePath).name
   // START ------------------------css组件提取
   //默认配置
-  let cssSetting = extend({selector: ["link[component]"], out: "/css/$file.css", search: []}, options.css);
+  let cssSetting = _utils.extend({selector: ["link[component]"], out: "/css/$file.css", search: []}, options.css);
   //需要输出的合并后的文件链接
   let cssHref =  _getOutputFilepath(cssSetting.out, htmlFileName, data.inputFileRelativePath)
 
   //固定link component  和  link[type='component/css']
   let errorMsg = [];
   let cssHrefList = [];
-  let find = findHref(errorMsg, cssHrefList, data)
+  let find = _utils.findHref(errorMsg, cssHrefList, data)
   content = content.replace(/<link((\s+)|[^>]+\s)component(\s?|(\s+[^>]+?))\/?>/g, find)
     .replace(/<link((\s+)|[^>]+\s)component=""(\s?|(\s+[^>]+?))\/?>/g, find)
     .replace(/<link((\s+)|[^>]+\s)type=['"]component\/css['"](\s?|(\s+[^>]+?))\/?>/g,find)
@@ -119,10 +89,10 @@ const mergeTagImport = (cli, content, options, data, buildConfig)=>{
   }
   // END ----------------------- css组件提取结束
   // START ------------------------js组件提取
-  let jsSetting = extend({selector: ["script[component]"], out: "/js/$file.js", search:[]}, options.js);
+  let jsSetting = _utils.extend({selector: ["script[component]"], out: "/js/$file.js", search:[]}, options.js);
   let jsSrc =  _getOutputFilepath(jsSetting.out, htmlFileName, data.inputFileRelativePath)
   let jsSrcList = [];
-  let findSrc = findHref(errorMsg, jsSrcList, data)
+  let findSrc = _utils.findHref(errorMsg, jsSrcList, data)
   content = content.replace(/<script((\s+)|[^>]+\s)component(\s?|(\s+[^>]+?))>\s?<\/script>/g, findSrc)
     .replace(/<script((\s+)|[^>]+\s)component=""(\s?|(\s+[^>]+?))>\s?<\/script>/g, findSrc)
     .replace(/<script((\s+)|[^>]+\s)type=['"]component\/js['"](\s?|(\s+[^>]+?))>\s?<\/script>/g,findSrc)
@@ -183,8 +153,20 @@ exports.registerPlugin = (cli, options)=>{
     }catch(e){
       cb(e)
     }
-
   }, 1)
+
+  cli.registerHook('preview:processCompile', (req, data, responseContent, cb)=>{
+    if(!/(\.html)$/.test(data.realPath) || !responseContent || data.status!= 200){
+      return cb(null, responseContent)
+    }
+    try{
+      responseContent = _previewMergeTag(responseContent, options, data.realPath)
+      cb(null, responseContent) 
+    }catch(e){
+      cb(e)
+    }
+  })
+
   cli.registerHook('build:didCompile', (buildConfig, data, content, cb)=>{
     if(!/(\.html)$/.test(data.outputFilePath) || !content){
       return cb(null, content)

@@ -101,7 +101,7 @@ const mergeTagImport = (cli, content, options, data, buildConfig)=>{
     throw new Error(errorMsg)
   }
   if(jsSrcList.length){
-    pushComponentToCompileFileQueue(cli, jsSrcList, cssHref, buildConfig, cssSetting);
+    pushComponentToCompileFileQueue(cli, jsSrcList, jsSrc, buildConfig, cssSetting);
     if(jsSetting.appendTo=="body"){
       content = content.replace(/<body>([\s\S]+?)<\/body>/, `<body>$1<script src="${jsSrc.replace(/\\/g, "/")}"></script></body>`)
     }else{

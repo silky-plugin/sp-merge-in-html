@@ -7,7 +7,7 @@ const _mergeScript = require('./merge-script');
 const _mergeStype = require('./merge-style');
 const _fs = require("fs");
 const _getOutputFilepath = require('./getOutputFilepath')
-const _previewMergeTag = require('./previewMergeTag')
+const _precompileMergeTag = require('./precompileMergeTag')
 const _utils = require('./utils')
 //寻找真实路径
 const getRealFilePath = (cli, href, setting)=>{
@@ -155,13 +155,10 @@ exports.registerPlugin = (cli, options)=>{
     }
   }, 1)
 
-  cli.registerHook('preview:processCompile', (req, data, responseContent, cb)=>{
-    if(!/(\.html)$/.test(data.realPath) || !responseContent || data.status!= 200){
-      return cb(null, responseContent)
-    }
+  cli.registerHook('precompile:insert', (buildConfig, fileItem, content, cb)=>{
     try{
-      responseContent = _previewMergeTag(responseContent, options, data.realPath)
-      cb(null, responseContent) 
+      content = _precompileMergeTag(content, options, fileItem.relativeFilePath)
+      cb(null, content) 
     }catch(e){
       cb(e)
     }

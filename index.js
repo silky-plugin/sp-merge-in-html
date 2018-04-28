@@ -138,42 +138,27 @@ const replaceTag = (content)=>{
 }
 
 exports.registerPlugin = (cli, options)=>{
-  cli.registerHook('route:willResponse', (req, data, responseContent, cb)=>{
+  cli.registerHook('route:willResponse', (req, data, responseContent)=>{
     let pathname = data.realPath;
     if(!/(\.html)$/.test(pathname)){
-      return cb(null,  responseContent)
+      return responseContent
     }
     //没有经过 hbs 编译, 纯html,不处理
     if(data.status != 200 || !responseContent){
-      return cb(null, responseContent)
+      return responseContent
     }
-    try{
-      responseContent = replaceTag(responseContent, data)
-      cb(null, responseContent)
-    }catch(e){
-      cb(e)
-    }
+    responseContent = replaceTag(responseContent, data)
+    return responseContent
   }, 1)
 
-  cli.registerHook('precompile:insert', (buildConfig, fileItem, content, cb)=>{
-    try{
-      content = _precompileMergeTag(content, options, fileItem.relativeFilePath)
-      cb(null, content) 
-    }catch(e){
-      cb(e)
-    }
+  cli.registerHook('precompile:insert', (buildConfig, fileItem, content)=>{
+    return  _precompileMergeTag(content, options, fileItem.relativeFilePath)
   })
 
-  cli.registerHook('build:didCompile', (buildConfig, data, content, cb)=>{
+  cli.registerHook('build:didCompile', (buildConfig, data, content)=>{
     if(!/(\.html)$/.test(data.outputFilePath) || !content){
-      return cb(null, content)
+      return content
     }
-    let err = null
-    try{
-      content = mergeTagImport(cli, content, options, data, buildConfig)
-    }catch(e){
-      err = e
-    }
-    cb(err, content)
+    return  mergeTagImport(cli, content, options, data, buildConfig)
   }, 1)
 }
